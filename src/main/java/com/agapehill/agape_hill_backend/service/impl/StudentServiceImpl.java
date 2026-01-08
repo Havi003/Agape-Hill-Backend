@@ -12,6 +12,7 @@ import com.agapehill.agape_hill_backend.domain.entity.FeeStatusEntity;
 import com.agapehill.agape_hill_backend.domain.entity.NextOfKinEntity;
 import com.agapehill.agape_hill_backend.domain.entity.StudentEntity;
 import com.agapehill.agape_hill_backend.dto.request.StudentRequest;
+import com.agapehill.agape_hill_backend.dto.response.FeeStatusResponse;
 import com.agapehill.agape_hill_backend.dto.response.StudentDashboardResponse;
 import com.agapehill.agape_hill_backend.dto.response.StudentResponse;
 import com.agapehill.agape_hill_backend.dto.response.WsHeader;
@@ -79,21 +80,33 @@ public Mono<WsResponse<StudentResponse>> createStudent(StudentRequest request) {
     return studentRepo.save(student)
         .flatMap(savedStudent -> feeStatusRepo.save(feeStatus)
             .flatMap(savedFeeStatus -> nokRepo.save(nextOfKin)
-                .map(savedNextOfKin -> new WsResponse<>(
+                .map(savedNextOfKin -> {
+                // Wrap the fee details
+                FeeStatusResponse feeDto = new FeeStatusResponse(
+                    savedFeeStatus.getTotalBilled(),
+                    savedFeeStatus.getTotalPaid(),
+                    savedFeeStatus.getBalance()
+                );
+
+                return new WsResponse<>(
                     new WsHeader("200", "Student Registered Successfully"),
                     new StudentResponse(
                         savedStudent.getId(),
                         savedStudent.getAdmissionNumber(),
                         savedStudent.getFullName(),
                         savedStudent.getStudentClass(),
-                        savedFeeStatus.getBalance(),
+                        savedStudent.getGender(),
+                        savedStudent.getRegisteredDate(),
+                        savedStudent.getDateOfBirth(),
+                        feeDto, // Updated to use the object
                         savedNextOfKin.getKinName(),
                         savedNextOfKin.getKinRelationship(),
                         savedNextOfKin.getKinContact()
                     )
-                ))
-            )
-        );
+                );
+            })
+        )
+    );
 }
 
     // 2.  Method to get the statisttics dashboard
@@ -145,12 +158,22 @@ public Mono<WsResponse<StudentResponse>> createStudent(StudentRequest request) {
     .map(tuple -> {
         FeeStatusEntity fee = tuple.getT1();
         NextOfKinEntity nok = tuple.getT2();
+
+        // Map the entity fields to the nested DTO
+        FeeStatusResponse feeDto = new FeeStatusResponse(
+            fee.getTotalBilled(),
+            fee.getTotalPaid(),
+            fee.getBalance()
+        );
         return new StudentResponse(
             student.getId(),
             student.getAdmissionNumber(),
             student.getFullName(),
             student.getStudentClass(),
-            fee.getBalance(),
+            student.getGender(),
+            student.getRegisteredDate(),
+            student.getDateOfBirth(),
+            feeDto,
             nok.getKinName(),
             nok.getKinRelationship(),
             nok.getKinContact()
