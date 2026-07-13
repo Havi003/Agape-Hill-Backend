@@ -17,7 +17,6 @@ import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/api/students")
-@CrossOrigin(origins = "http://localhost:5173")
 @RequiredArgsConstructor
 public class StudentController {
 

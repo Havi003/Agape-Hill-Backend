@@ -1,6 +1,5 @@
 package com.agapehill.agape_hill_backend.controller;
 
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -16,7 +15,6 @@ import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/api/mpesa")
-@CrossOrigin(origins = "http://localhost:5173")
 @RequiredArgsConstructor
 public class MpesaController {
 
