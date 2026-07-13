@@ -6,4 +6,9 @@ import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 
 import com.agapehill.agape_hill_backend.domain.entity.NextOfKinEntity;
 
-public interface NextOfKinRepository extends ReactiveCrudRepository <NextOfKinEntity, UUID> {}
+import reactor.core.publisher.Mono;
+
+public interface NextOfKinRepository extends ReactiveCrudRepository <NextOfKinEntity, UUID> {
+
+        Mono<NextOfKinEntity> findByStudentId(UUID studentId);
+}

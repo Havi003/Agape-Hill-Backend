@@ -20,6 +20,7 @@ public interface StudentRepository extends ReactiveCrudRepository <StudentEntity
     Mono<Long> countByRegisteredDateAfter(LocalDate date);
 
     
+    Mono<StudentEntity> findByAdmissionNumberIgnoreCase(String admissionNumber);
 
     // Supports searching by Name or Admission Number as shown in the search bar
     @Query("SELECT * FROM school.students WHERE " +

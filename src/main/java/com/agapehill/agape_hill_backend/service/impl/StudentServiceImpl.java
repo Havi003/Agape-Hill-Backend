@@ -12,14 +12,8 @@ import com.agapehill.agape_hill_backend.domain.entity.FeeStatusEntity;
 import com.agapehill.agape_hill_backend.domain.entity.NextOfKinEntity;
 import com.agapehill.agape_hill_backend.domain.entity.StudentEntity;
 import com.agapehill.agape_hill_backend.dto.request.StudentRequest;
-import com.agapehill.agape_hill_backend.dto.response.FeeStatusResponse;
-import com.agapehill.agape_hill_backend.dto.response.StudentDashboardResponse;
-import com.agapehill.agape_hill_backend.dto.response.StudentResponse;
-import com.agapehill.agape_hill_backend.dto.response.WsHeader;
-import com.agapehill.agape_hill_backend.dto.response.WsResponse;
-import com.agapehill.agape_hill_backend.repository.FeesStatusRepository;
-import com.agapehill.agape_hill_backend.repository.NextOfKinRepository;
-import com.agapehill.agape_hill_backend.repository.StudentRepository;
+import com.agapehill.agape_hill_backend.dto.response.*;
+import com.agapehill.agape_hill_backend.repository.*;
 import com.agapehill.agape_hill_backend.service.StudentService;
 
 import lombok.RequiredArgsConstructor;
@@ -28,162 +22,225 @@ import reactor.core.publisher.Mono;
 
 @Service
 @RequiredArgsConstructor
-public class StudentServiceImpl implements StudentService{
-
-  //1. Method to create new Students
-    private final StudentRepository studentRepo;
+public class StudentServiceImpl implements StudentService {
+private final StudentRepository studentRepo;
     private final NextOfKinRepository nokRepo;
     private final FeesStatusRepository feeStatusRepo;
 
-
-@Override
-@Transactional
-public Mono<WsResponse<StudentResponse>> createStudent(StudentRequest request) {
-
-    UUID studentId = UUID.randomUUID();
-
-    // 1. Safety Check for fee values
-    // If frontend sends null, we default to 0.00 to prevent the crash
-    BigDecimal billed = (request.getTotalBilled() != null) ? request.getTotalBilled() : BigDecimal.ZERO;
-    BigDecimal paid = (request.getTotalPaid() != null) ? request.getTotalPaid() : BigDecimal.ZERO;
-    BigDecimal balance = billed.subtract(paid);
-
-    StudentEntity student = new StudentEntity(
-        studentId,
-        "ADM" + System.currentTimeMillis(), 
-        request.getFullName(),
-        request.getGender(),
-        request.getDateOfBirth(),
-        request.getStudentClass(),
-        LocalDate.now(),
-        true
-    );
-
-    NextOfKinEntity nextOfKin = new NextOfKinEntity(
-        studentId,
-        request.getKinName(),
-        request.getKinRelationship(),
-        request.getKinContact(),
-        request.getKinAdress(),
-        true
-    );
-
-    // 2. Use the pre-calculated safe variables here
-    FeeStatusEntity feeStatus = new FeeStatusEntity(
-        studentId,
-        billed,
-        paid,
-        balance,
-        true
-    );
-
-    return studentRepo.save(student)
-        .flatMap(savedStudent -> feeStatusRepo.save(feeStatus)
-            .flatMap(savedFeeStatus -> nokRepo.save(nextOfKin)
-                .map(savedNextOfKin -> {
-                // Wrap the fee details
-                FeeStatusResponse feeDto = new FeeStatusResponse(
-                    savedFeeStatus.getTotalBilled(),
-                    savedFeeStatus.getTotalPaid(),
-                    savedFeeStatus.getBalance()
-                );
-
-                return new WsResponse<>(
-                    new WsHeader("200", "Student Registered Successfully"),
-                    new StudentResponse(
-                        savedStudent.getId(),
-                        savedStudent.getAdmissionNumber(),
-                        savedStudent.getFullName(),
-                        savedStudent.getStudentClass(),
-                        savedStudent.getGender(),
-                        savedStudent.getRegisteredDate(),
-                        savedStudent.getDateOfBirth(),
-                        feeDto, // Updated to use the object
-                        savedNextOfKin.getKinName(),
-                        savedNextOfKin.getKinRelationship(),
-                        savedNextOfKin.getKinContact()
-                    )
-                );
-            })
-        )
-    );
-}
-
-    // 2.  Method to get the statisttics dashboard
-
-    public Mono<WsResponse <StudentDashboardResponse>> getStudentDashboardStats(){
-
-    //get the first day of the month
-    LocalDate firstdayOfMonth = LocalDate.now().withDayOfMonth(1);
-
-    return Mono.zip(
-     studentRepo.count()
-    ,studentRepo.countByGenderIgnoreCase("Male")
-    ,studentRepo.countByGenderIgnoreCase("Female")
-    , studentRepo.countByRegisteredDateAfter(firstdayOfMonth.minusDays(1))
-   ).map(tuple ->{
-     long total = tuple.getT1();
-     long male = tuple.getT2();
-     long female = tuple.getT3();
-     long newThisMonth = tuple.getT4();
-
-     // Calculate percentages
-        double malePerc = total > 0 ? (double) male / total * 100 : 0;
-        double femalePerc = total > 0 ? (double) female / total * 100 : 0;
-
-        StudentDashboardResponse stats = new StudentDashboardResponse(
-            total, male, female, newThisMonth, malePerc, femalePerc
-        );
-
-        return new WsResponse<>(new WsHeader("200", "Dashboard data Retrieved"),stats);
-
-   });
-
+    // =========================================================
+    // 1. CREATE SINGLE STUDENT
+    // =========================================================
+    @Override
+    @Transactional
+    public Mono<WsResponse<StudentResponse>> createStudent(StudentRequest request) {
+        return saveStudentEntityGroup(request)
+                .map(response -> new WsResponse<>(
+                        new WsHeader("200", "Student Registered Successfully"),
+                        response
+                ));
     }
 
-    //3.  Search for students by name nemis or admission number
+    // =========================================================
+    // 2. CREATE STUDENTS IN BULK (New Functionality)
+    // =========================================================
+    @Override
+    @Transactional
+    public Mono<WsResponse<List<StudentResponse>>> createStudentsInBulk(List<StudentRequest> requests) {
+        // Flux.fromIterable handles the list
+        // flatMap processes them concurrently. We limit concurrency to 10 to avoid 
+        // overwhelming the R2DBC connection pool for very large Excel files.
+        return Flux.fromIterable(requests)
+                .flatMap(this::saveStudentEntityGroup, 10) 
+                .collectList()
+                .map(savedStudents -> new WsResponse<>(
+                        new WsHeader("200", savedStudents.size() + " Students Registered Successfully"),
+                        savedStudents
+                ));
+    }
 
-  public Mono<WsResponse<List<StudentResponse>>> getAllStudentsWithBalance(String search) {
-    LocalDate startOfMonth = LocalDate.now().withDayOfMonth(1); // For "This Month" logic
+    // =========================================================
+    // HELPER: CORE CREATION LOGIC (Used by Single & Bulk)
+    // =========================================================
+    private Mono<StudentResponse> saveStudentEntityGroup(StudentRequest request) {
+        BigDecimal billed = request.getTotalBilled() != null ? request.getTotalBilled() : BigDecimal.ZERO;
+        BigDecimal paid = request.getTotalPaid() != null ? request.getTotalPaid() : BigDecimal.ZERO;
+        BigDecimal balance = billed.subtract(paid);
 
-    Flux<StudentEntity> studentFlux = (search == null || search.isBlank()) 
-        ? studentRepo.findAll() 
-        : studentRepo.searchStudents(search);
+        StudentEntity student = new StudentEntity(
+                null,
+                "ADM" + System.currentTimeMillis() + (int)(Math.random() * 1000), // Added random to avoid ADM collision in rapid bulk loops
+                request.getFullName(),
+                request.getStudentGender(),
+                request.getNemisNumber(),
+                request.getDateOfBirth(),
+                request.getStudentClass(),
 
-    return studentFlux.flatMap(student -> 
-    Mono.zip(
-        feeStatusRepo.findById(student.getId()),
-        nokRepo.findById(student.getId())
-    )
-    .map(tuple -> {
-        FeeStatusEntity fee = tuple.getT1();
-        NextOfKinEntity nok = tuple.getT2();
-
-        // Map the entity fields to the nested DTO
-        FeeStatusResponse feeDto = new FeeStatusResponse(
-            fee.getTotalBilled(),
-            fee.getTotalPaid(),
-            fee.getBalance()
+                LocalDate.now()
         );
-        return new StudentResponse(
-            student.getId(),
-            student.getAdmissionNumber(),
-            student.getFullName(),
-            student.getStudentClass(),
-            student.getGender(),
-            student.getRegisteredDate(),
-            student.getDateOfBirth(),
-            feeDto,
-            nok.getKinName(),
-            nok.getKinRelationship(),
-            nok.getKinContact()
-        );
-    })
-)
-    .collectList() // Converts Flux<StudentResponse> to Mono<List<StudentResponse>>
-    .map(studentList -> new WsResponse<>(
-        new WsHeader("200", "Students retrieved successfully"),
-        studentList
-    ));
-}
+
+        return studentRepo.save(student)
+                .flatMap(savedStudent -> {
+                    FeeStatusEntity feeStatus = new FeeStatusEntity(
+                            savedStudent.getId(), billed, paid, balance, true
+                    );
+
+                    NextOfKinEntity nextOfKin = new NextOfKinEntity(
+                            null, savedStudent.getId(),
+                            request.getKinName(), request.getKinRelationship(),
+                            request.getKinContact(), request.getKinAddress(),
+                            request.getKinEmail()
+                    );
+
+                    return feeStatusRepo.save(feeStatus)
+                            .flatMap(savedFee -> nokRepo.save(nextOfKin)
+                                    .map(savedNok -> {
+                                        FeeStatusResponse feeDto = new FeeStatusResponse(
+                                                savedFee.getTotalBilled(),
+                                                savedFee.getTotalPaid(),
+                                                savedFee.getBalance()
+                                        );
+
+                                        return new StudentResponse(
+                                                savedStudent.getId(),
+                                                savedStudent.getAdmissionNumber(),
+                                                savedStudent.getFullName(),
+                                                savedStudent.getStudentClass(),
+                                                savedStudent.getGender(),
+                                                savedStudent.getNemisNumber(),
+                                                savedStudent.getRegisteredDate(),
+                                                savedStudent.getDateOfBirth(),
+                                                feeDto,
+                                                savedNok.getKinName(),
+                                                savedNok.getKinRelationship(),
+                                                savedNok.getKinContact()
+                                        );
+                                    })
+                            );
+                });
+    }
+
+    // =========================================================
+    // 2. DASHBOARD STATS
+    // =========================================================
+    public Mono<WsResponse<StudentDashboardResponse>> getStudentDashboardStats() {
+
+        LocalDate firstDayOfMonth = LocalDate.now().withDayOfMonth(1);
+
+        return Mono.zip(
+                        studentRepo.count(),
+                        studentRepo.countByGenderIgnoreCase("Male"),
+                        studentRepo.countByGenderIgnoreCase("Female"),
+                        studentRepo.countByRegisteredDateAfter(firstDayOfMonth.minusDays(1))
+                )
+                .map(tuple -> {
+
+                    long total = tuple.getT1();
+                    long male = tuple.getT2();
+                    long female = tuple.getT3();
+                    long newThisMonth = tuple.getT4();
+
+                    double malePerc = total > 0 ? (male * 100.0) / total : 0;
+                    double femalePerc = total > 0 ? (female * 100.0) / total : 0;
+
+                    StudentDashboardResponse stats = new StudentDashboardResponse(
+                            total,
+                            male,
+                            female,
+                            newThisMonth,
+                            malePerc,
+                            femalePerc
+                    );
+
+                    return new WsResponse<>(
+                            new WsHeader("200", "Dashboard data Retrieved"),
+                            stats
+                    );
+                });
+    }
+
+    // =========================================================
+    // 3. GET ALL STUDENTS (Fixed: Added defaultIfEmpty to feeStatusRepo)
+    // =========================================================
+    public Mono<WsResponse<List<StudentResponse>>> getAllStudentsWithBalance(String search) {
+
+        Flux<StudentEntity> studentFlux =
+                (search == null || search.isBlank())
+                        ? studentRepo.findAll()
+                        : studentRepo.searchStudents(search);
+
+        return studentFlux
+                .flatMap(student ->
+
+                        Mono.zip(
+                                        feeStatusRepo.findById(student.getId())
+                                                // Default added here so zip doesn't cancel if a fee record is missing
+                                                .defaultIfEmpty(new FeeStatusEntity(student.getId(), BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, true)),
+                                        nokRepo.findByStudentId(student.getId())
+                                                .defaultIfEmpty(
+                                                new NextOfKinEntity(
+                                                        null,
+                                                        student.getId(),
+                                                        "N/A",
+                                                        "N/A",
+                                                        "N/A",
+                                                        null,
+                                                        null
+                                                )
+                                        )
+                                )
+                                .map(tuple -> {
+
+                                    FeeStatusEntity fee = tuple.getT1();
+                                    NextOfKinEntity nok = tuple.getT2();
+
+                                    FeeStatusResponse feeDto = new FeeStatusResponse(
+                                            fee.getTotalBilled(),
+                                            fee.getTotalPaid(),
+                                            fee.getBalance()
+                                    );
+
+                                    return new StudentResponse(
+                                            student.getId(),
+                                            student.getAdmissionNumber(),
+                                            student.getFullName(),
+                                            student.getStudentClass(),
+                                            student.getGender(),
+                                            student.getNemisNumber(),
+                                            student.getRegisteredDate(),
+                                            student.getDateOfBirth(),
+                                            feeDto,
+                                            nok.getKinName(),
+                                            nok.getKinRelationship(),
+                                            nok.getKinContact()
+                                    );
+                                })
+                )
+                .collectList()
+                .map(list -> new WsResponse<>(
+                        new WsHeader("200", "Students retrieved successfully"),
+                        list
+                ));
+    }
+
+    // =========================================================
+    // 4. GET NEXT OF KIN 
+    // =========================================================
+    @Override
+    public Mono<WsResponse<NextOfKinResponse>> getNextOfKinInformation(UUID studentId) {
+
+        return nokRepo.findByStudentId(studentId)
+                .map(nok -> new WsResponse<>(
+                        new WsHeader("200", "Next of Kin Retrieved Successfully"),
+                        new NextOfKinResponse(
+                                nok.getKinName(),
+                                nok.getKinRelationship(),
+                                nok.getKinContact(),
+                                nok.getKinEmail(),
+                                nok.getKinAddress()
+                        )
+                ))
+                .switchIfEmpty(
+                        Mono.error(new RuntimeException("Next of Kin not found"))
+                );
+    }
 }

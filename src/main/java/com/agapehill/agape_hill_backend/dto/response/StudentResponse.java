@@ -17,6 +17,7 @@ public class StudentResponse {
     private String fullName;
     private String studentClass;
     private String studentGender;
+    private String nemisNumber;
     private LocalDate registeredDate;
     private LocalDate dateOfBirth;
 
@@ -25,5 +26,6 @@ public class StudentResponse {
     private String kinName;
     private String kinRelationship;
     private String kinContact;
+    
 
 }

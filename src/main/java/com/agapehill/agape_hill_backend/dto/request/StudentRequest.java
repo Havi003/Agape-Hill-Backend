@@ -10,7 +10,8 @@ import lombok.Data;
 public class StudentRequest {
     
     private String fullName;
-    private String gender;
+    
+    private String studentGender;
     private LocalDate dateOfBirth;
     private String studentClass;
 
@@ -20,6 +21,8 @@ public class StudentRequest {
     private String kinName;
     private String kinRelationship;
     private String kinContact;
-    private String kinAdress;
+    private String kinAddress;
+    private String kinEmail;
+    private String nemisNumber;
 
 }
