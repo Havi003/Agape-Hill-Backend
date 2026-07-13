@@ -1,0 +1,20 @@
+.git
+.gitignore
+.gitattributes
+
+target/
+build/
+
+# Environment files contain runtime secrets and must never enter an image.
+.env
+.env.*
+
+.idea/
+.vscode/
+*.iml
+*.log
+
+HELP.md
+mvnw
+mvnw.cmd
+.mvn/

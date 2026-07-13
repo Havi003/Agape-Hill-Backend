@@ -1,0 +1,18 @@
+services:
+  backend:
+    build:
+      context: .
+      target: runtime
+    image: agape-hill-backend:local
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+      # Inside a container, localhost means the container itself. This hostname
+      # routes back to PostgreSQL running directly on the development computer.
+      DB_HOST: host.docker.internal
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${HOST_PORT:-8080}:${PORT:-8080}"
+    restart: unless-stopped
