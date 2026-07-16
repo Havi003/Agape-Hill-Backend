@@ -9,6 +9,7 @@ import com.agapehill.agape_hill_backend.dto.request.MpesaConfirmationRequest;
 import com.agapehill.agape_hill_backend.dto.request.MpesaValidationRequest;
 import com.agapehill.agape_hill_backend.dto.response.MpesaCallbackResponse;
 import com.agapehill.agape_hill_backend.service.MpesaService;
+import com.agapehill.agape_hill_backend.dto.response.MpesaRegisterUrlResponse;
 
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Mono;
@@ -20,6 +21,12 @@ public class MpesaController {
 
     private final MpesaService mpesaService;
 
+
+    @PostMapping("/register-urls")
+    public Mono<MpesaRegisterUrlResponse> registerUrls() {
+        return mpesaService.registerC2BUrls();
+    }
+    
     @PostMapping("/validation")
     public Mono<MpesaCallbackResponse> validatePayment(@RequestBody MpesaValidationRequest request) {
         return mpesaService.validatePayment(request);
