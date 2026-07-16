@@ -5,6 +5,7 @@ import java.util.UUID;
 
 import org.springframework.web.bind.annotation.*;
 
+import com.agapehill.agape_hill_backend.dto.request.NextOfKinRequest;
 import com.agapehill.agape_hill_backend.dto.request.StudentRequest;
 import com.agapehill.agape_hill_backend.dto.response.NextOfKinResponse;
 import com.agapehill.agape_hill_backend.dto.response.StudentDashboardResponse;
@@ -67,5 +68,16 @@ public class StudentController {
     @GetMapping("/{studentId}/next-of-kin")
     public Mono<WsResponse<NextOfKinResponse>> getNextOfKinInformation(@PathVariable UUID studentId) {
         return studentService.getNextOfKinInformation(studentId);
+    }
+
+    /**
+     * PUT /api/students/{studentId}/next-of-kin
+     * Action: Update Next of Kin information for a given student
+     */
+    @PutMapping("/{studentId}/next-of-kin")
+    public Mono<WsResponse<NextOfKinResponse>> updateNextOfKinInformation(
+            @PathVariable UUID studentId,
+            @RequestBody NextOfKinRequest request) {
+        return studentService.updateNextOfKinInformation(studentId, request);
     }
 }

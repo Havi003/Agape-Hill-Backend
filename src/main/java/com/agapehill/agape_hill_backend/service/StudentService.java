@@ -3,6 +3,7 @@ package com.agapehill.agape_hill_backend.service;
 import java.util.List;
 import java.util.UUID;
 
+import com.agapehill.agape_hill_backend.dto.request.NextOfKinRequest;
 import com.agapehill.agape_hill_backend.dto.request.StudentRequest;
 import com.agapehill.agape_hill_backend.dto.response.NextOfKinResponse;
 import com.agapehill.agape_hill_backend.dto.response.StudentDashboardResponse;
@@ -16,6 +17,7 @@ public interface StudentService {
     Mono<WsResponse <StudentDashboardResponse>> getStudentDashboardStats();
     Mono <WsResponse <List<StudentResponse>>> getAllStudentsWithBalance (String search);
     Mono<WsResponse<NextOfKinResponse>> getNextOfKinInformation(UUID studentId);
+    Mono<WsResponse<NextOfKinResponse>> updateNextOfKinInformation(UUID studentId, NextOfKinRequest request);
     Mono<WsResponse<List<StudentResponse>>> createStudentsInBulk(List<StudentRequest> requests);
 
 }

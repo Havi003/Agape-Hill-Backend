@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.agapehill.agape_hill_backend.domain.entity.FeeStatusEntity;
 import com.agapehill.agape_hill_backend.domain.entity.NextOfKinEntity;
 import com.agapehill.agape_hill_backend.domain.entity.StudentEntity;
+import com.agapehill.agape_hill_backend.dto.request.NextOfKinRequest;
 import com.agapehill.agape_hill_backend.dto.request.StudentRequest;
 import com.agapehill.agape_hill_backend.dto.response.*;
 import com.agapehill.agape_hill_backend.repository.*;
@@ -245,16 +246,43 @@ private final StudentRepository studentRepo;
         return nokRepo.findByStudentId(studentId)
                 .map(nok -> new WsResponse<>(
                         new WsHeader("200", "Next of Kin Retrieved Successfully"),
-                        new NextOfKinResponse(
-                                nok.getKinName(),
-                                nok.getKinRelationship(),
-                                nok.getKinContact(),
-                                nok.getKinEmail(),
-                                nok.getKinAddress()
-                        )
+                        mapNextOfKinResponse(nok)
                 ))
                 .switchIfEmpty(
                         Mono.error(new RuntimeException("Next of Kin not found"))
                 );
+    }
+
+    // =========================================================
+    // 5. UPDATE NEXT OF KIN
+    // =========================================================
+    @Override
+    public Mono<WsResponse<NextOfKinResponse>> updateNextOfKinInformation(UUID studentId, NextOfKinRequest request) {
+
+        return nokRepo.findByStudentId(studentId)
+                .switchIfEmpty(Mono.error(new RuntimeException("Next of Kin not found")))
+                .flatMap(nok -> {
+                    nok.setKinName(request.getName());
+                    nok.setKinRelationship(request.getRelationship());
+                    nok.setKinContact(request.getPhoneNumber());
+                    nok.setKinEmail(request.getEmail());
+                    nok.setKinAddress(request.getAddress());
+
+                    return nokRepo.save(nok);
+                })
+                .map(savedNok -> new WsResponse<>(
+                        new WsHeader("200", "Next of Kin Updated Successfully"),
+                        mapNextOfKinResponse(savedNok)
+                ));
+    }
+
+    private NextOfKinResponse mapNextOfKinResponse(NextOfKinEntity nok) {
+        return new NextOfKinResponse(
+                nok.getKinName(),
+                nok.getKinRelationship(),
+                nok.getKinContact(),
+                nok.getKinEmail(),
+                nok.getKinAddress()
+        );
     }
 }
