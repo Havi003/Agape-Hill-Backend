@@ -27,11 +27,34 @@ public class FeePaymentEntity {
     @Column("mpesa_transaction_id")
     private UUID mpesaTransactionId;
 
+    @Column("academic_year_id")
+    private UUID academicYearId;
+
+    @Column("term_id")
+    private UUID termId;
+
     private BigDecimal amount;
+
+    @Column("payment_method")
+    private String paymentMethod;
+
+    private String reference;
+
+    private String notes;
 
     @Column("paid_at")
     private LocalDateTime paidAt;
 
     @Column("recorded_at")
     private LocalDateTime recordedAt;
+
+    public FeePaymentEntity(UUID id, UUID studentId, UUID mpesaTransactionId, BigDecimal amount, LocalDateTime paidAt, LocalDateTime recordedAt) {
+        this.id = id;
+        this.studentId = studentId;
+        this.mpesaTransactionId = mpesaTransactionId;
+        this.amount = amount;
+        this.paymentMethod = "MPESA";
+        this.paidAt = paidAt;
+        this.recordedAt = recordedAt;
+    }
 }

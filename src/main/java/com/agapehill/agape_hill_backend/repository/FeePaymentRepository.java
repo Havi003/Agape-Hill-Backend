@@ -17,10 +17,15 @@ public interface FeePaymentRepository extends ReactiveCrudRepository<FeePaymentE
 
     Flux<FeePaymentEntity> findByStudentIdOrderByPaidAtDesc(UUID studentId);
 
+    Flux<FeePaymentEntity> findByStudentIdAndTermIdOrderByPaidAtDesc(UUID studentId, UUID termId);
+
     Mono<FeePaymentEntity> findByMpesaTransactionId(UUID mpesaTransactionId);
 
     Mono<Boolean> existsByMpesaTransactionId(UUID mpesaTransactionId);
 
     @Query("SELECT COALESCE(SUM(amount), 0) FROM school.fee_payments WHERE student_id = :studentId")
     Mono<BigDecimal> sumAmountByStudentId(UUID studentId);
+
+    @Query("SELECT COALESCE(SUM(amount), 0) FROM school.fee_payments WHERE student_id = :studentId AND term_id = :termId")
+    Mono<BigDecimal> sumAmountByStudentIdAndTermId(UUID studentId, UUID termId);
 }

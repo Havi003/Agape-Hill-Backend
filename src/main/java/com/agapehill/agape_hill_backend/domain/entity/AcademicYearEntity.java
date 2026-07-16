@@ -1,0 +1,41 @@
+package com.agapehill.agape_hill_backend.domain.entity;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Table(name = "academic_years", schema = "school")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class AcademicYearEntity {
+
+    @Id
+    private UUID id;
+
+    @Column("year_name")
+    private String yearName;
+
+    @Column("start_date")
+    private LocalDate startDate;
+
+    @Column("end_date")
+    private LocalDate endDate;
+
+    @Column("is_active")
+    private boolean active;
+
+    @Column("created_at")
+    private LocalDateTime createdAt;
+
+    @Column("updated_at")
+    private LocalDateTime updatedAt;
+}
