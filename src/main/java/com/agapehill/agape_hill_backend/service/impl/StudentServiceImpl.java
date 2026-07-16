@@ -46,11 +46,8 @@ private final StudentRepository studentRepo;
     @Override
     @Transactional
     public Mono<WsResponse<List<StudentResponse>>> createStudentsInBulk(List<StudentRequest> requests) {
-        // Flux.fromIterable handles the list
-        // flatMap processes them concurrently. We limit concurrency to 10 to avoid 
-        // overwhelming the R2DBC connection pool for very large Excel files.
         return Flux.fromIterable(requests)
-                .flatMap(this::saveStudentEntityGroup, 10) 
+                .concatMap(this::saveStudentEntityGroup)
                 .collectList()
                 .map(savedStudents -> new WsResponse<>(
                         new WsHeader("200", savedStudents.size() + " Students Registered Successfully"),
@@ -66,9 +63,26 @@ private final StudentRepository studentRepo;
         BigDecimal paid = request.getTotalPaid() != null ? request.getTotalPaid() : BigDecimal.ZERO;
         BigDecimal balance = billed.subtract(paid);
 
+        return generateAdmissionNumber()
+                .flatMap(admissionNumber -> saveStudentEntityGroup(request, billed, paid, balance, admissionNumber));
+    }
+
+    private Mono<String> generateAdmissionNumber() {
+        return studentRepo.findHighestAgapeHillAdmissionSequence()
+                .defaultIfEmpty(0)
+                .map(highestSequence -> String.format("AH%03d", highestSequence + 1));
+    }
+
+    private Mono<StudentResponse> saveStudentEntityGroup(
+            StudentRequest request,
+            BigDecimal billed,
+            BigDecimal paid,
+            BigDecimal balance,
+            String admissionNumber
+    ) {
         StudentEntity student = new StudentEntity(
                 null,
-                "ADM" + System.currentTimeMillis() + (int)(Math.random() * 1000), // Added random to avoid ADM collision in rapid bulk loops
+                admissionNumber,
                 request.getFullName(),
                 request.getStudentGender(),
                 request.getNemisNumber(),

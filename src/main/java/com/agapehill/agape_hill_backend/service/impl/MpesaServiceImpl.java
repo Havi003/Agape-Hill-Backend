@@ -64,7 +64,7 @@ public class MpesaServiceImpl implements MpesaService {
 
         return generateAccessToken()
                 .flatMap(accessToken -> mpesaWebClient.post()
-                        .uri("/mpesa/c2b/v1/registerurl")
+                        .uri("/mpesa/c2b/v2/registerurl")
                         .header("Authorization", "Bearer " + accessToken)
                         .bodyValue(request)
                         .retrieve()

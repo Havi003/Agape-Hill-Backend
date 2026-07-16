@@ -13,6 +13,10 @@ import reactor.core.publisher.Mono;
 
 public interface StudentRepository extends ReactiveCrudRepository <StudentEntity, UUID>{
 
+    @Query("SELECT COALESCE(MAX(CAST(SUBSTRING(admission_number FROM 3) AS INTEGER)), 0) " +
+           "FROM school.students WHERE admission_number ~ '^AH[0-9]+$'")
+    Mono<Integer> findHighestAgapeHillAdmissionSequence();
+
 // Counts by the 'gender' field in your entity
     Mono<Long> countByGenderIgnoreCase(String gender);
 
